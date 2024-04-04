@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"regexp"
+
 	// Uncomment this block to pass the first stage
 	"net"
 	"os"
@@ -18,9 +21,44 @@ func main() {
 		fmt.Println("Failed to bind to port 6379")
 		os.Exit(1)
 	}
-	_, err = l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+	defer l.Close()
+
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
+		handleClient(conn)
 	}
+}
+
+func handleClient(conn net.Conn) {
+	// Ensure we close the connection after we're done
+	defer conn.Close()
+
+	// Read data
+	buf := make([]byte, 1024)
+	n, err := conn.Read(buf)
+	command := string(buf[:n])
+
+	if err != nil {
+		return
+	}
+
+	log.Println("Received data", buf[:n])
+	log.Println("command", command)
+	pattern := `ping`
+
+	// Compile the regex pattern
+	regex := regexp.MustCompile(pattern)
+
+	// Check if the multiline string matches the regex pattern
+	if regex.MatchString(command) {
+		conn.Write([]byte("+PONG\r\n"))
+		fmt.Println("Multiline string matches the pattern")
+	} else {
+		fmt.Println("Multiline string does not match the pattern")
+	}
+
 }
