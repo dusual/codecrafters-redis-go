@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
-	"regexp"
-
 	// Uncomment this block to pass the first stage
 	"net"
 	"os"
@@ -38,27 +37,32 @@ func handleClient(conn net.Conn) {
 	defer conn.Close()
 
 	// Read data
-	buf := make([]byte, 1024)
-	n, err := conn.Read(buf)
-	command := string(buf[:n])
 
-	if err != nil {
-		return
+	for {
+		buf := make([]byte, 1024)
+		n, err := conn.Read(buf)
+		command := string(buf[:n])
+
+		if err == io.EOF {
+			fmt.Println("Connection closed")
+			break
+		}
+
+		if err != nil {
+			return
+			break
+		}
+
+		log.Println("Received data", buf[:n])
+		log.Println("command", command)
+
+		// Compile the regex pattern
+
+		// Check if the multiline string matches the regex pattern
+		if command == "*1\r\n$4\r\nping\r\n" {
+			conn.Write([]byte("+PONG\r\n"))
+		} else {
+			fmt.Println("Multiline string does not match the pattern")
+		}
 	}
-
-	log.Println("Received data", buf[:n])
-	log.Println("command", command)
-	pattern := `ping`
-
-	// Compile the regex pattern
-	regex := regexp.MustCompile(pattern)
-
-	// Check if the multiline string matches the regex pattern
-	if regex.MatchString(command) {
-		conn.Write([]byte("+PONG\r\n"))
-		fmt.Println("Multiline string matches the pattern")
-	} else {
-		fmt.Println("Multiline string does not match the pattern")
-	}
-
 }
