@@ -4,10 +4,17 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strings"
+
 	// Uncomment this block to pass the first stage
 	"net"
 	"os"
 )
+
+type RespCommand struct {
+	command string
+	args    []string
+}
 
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -30,6 +37,24 @@ func main() {
 		}
 		go handleClient(conn)
 	}
+}
+
+func parseRespCommand(commandString string) (RespCommand, error) {
+	lines := strings.Split(commandString, "\r\n")
+	respCommand := RespCommand{}
+	respCommand.command = lines[2]
+	if len(lines) > 3 {
+		for i, argLine := range lines[3:] {
+			if i%2 == 1 {
+				respCommand.args = append(respCommand.args, argLine)
+			}
+		}
+	}
+	return respCommand, nil
+}
+
+func createBulkString(s string) string {
+	return fmt.Sprintf("$%d\r\n%s\r\n", len(s), s)
 }
 
 func handleClient(conn net.Conn) {
@@ -59,10 +84,19 @@ func handleClient(conn net.Conn) {
 		// Compile the regex pattern
 
 		// Check if the multiline string matches the regex pattern
-		if command == "*1\r\n$4\r\nping\r\n" {
+		respCommand, err := parseRespCommand(command)
+		if err != nil {
+			log.Println("Error parsing command: ", err.Error())
+			break
+		}
+		switch strings.ToLower(respCommand.command) {
+		case "ping":
 			conn.Write([]byte("+PONG\r\n"))
-		} else {
-			fmt.Println("Multiline string does not match the pattern")
+		case "echo":
+			conn.Write([]byte(createBulkString(respCommand.args[0])))
+		default:
+			fmt.Printf("unhandled command: %s\n", respCommand.command)
+
 		}
 	}
 }
