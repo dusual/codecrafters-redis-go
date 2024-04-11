@@ -16,6 +16,19 @@ type RespCommand struct {
 	args    []string
 }
 
+type Store struct {
+	data map[string]string
+}
+
+func (s Store) SET(key string, val string) {
+	s.data[key] = val
+}
+
+func (s Store) GET(key string) (string, bool) {
+	val, ok := s.data[key]
+	return val, ok
+}
+
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
@@ -29,13 +42,17 @@ func main() {
 	}
 	defer l.Close()
 
+	store := Store{
+		data: make(map[string]string),
+	}
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
-		go handleClient(conn)
+		go handleClient(conn, store)
 	}
 }
 
@@ -57,7 +74,7 @@ func createBulkString(s string) string {
 	return fmt.Sprintf("$%d\r\n%s\r\n", len(s), s)
 }
 
-func handleClient(conn net.Conn) {
+func handleClient(conn net.Conn, store Store) {
 	// Ensure we close the connection after we're done
 	defer conn.Close()
 
@@ -89,11 +106,24 @@ func handleClient(conn net.Conn) {
 			log.Println("Error parsing command: ", err.Error())
 			break
 		}
+		fmt.Println(respCommand.args)
 		switch strings.ToLower(respCommand.command) {
 		case "ping":
 			conn.Write([]byte("+PONG\r\n"))
 		case "echo":
 			conn.Write([]byte(createBulkString(respCommand.args[0])))
+		case "set":
+			key, val := respCommand.args[0], respCommand.args[1]
+			store.SET(key, val)
+			conn.Write([]byte("+OK\r\n"))
+		case "get":
+			key := respCommand.args[0]
+			val, ok := store.GET(key)
+			if !ok {
+				conn.Write([]byte("+NULL\r\n"))
+			} else {
+				conn.Write([]byte(createBulkString(val)))
+			}
 		default:
 			fmt.Printf("unhandled command: %s\n", respCommand.command)
 
