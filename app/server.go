@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strconv"
 	"strings"
 
 	// Uncomment this block to pass the first stage
@@ -115,12 +116,30 @@ func handleClient(conn net.Conn, store Store) {
 		case "set":
 			key, val := respCommand.args[0], respCommand.args[1]
 			store.SET(key, val)
+			if len(respCommand.args) > 2 {
+				fmt.Println("3rd argument", respCommand.args[2])
+				if strings.ToLower(respCommand.args[2]) == "px" {
+					if len(respCommand.args) < 4 {
+						fmt.Println("Insufficient arguments")
+					}
+					if len(respCommand.args) == 4 {
+						expiryTime, err := strconv.ParseInt(respCommand.args[3], 10, 64)
+						if err != nil {
+							fmt.Println("Error:", err)
+							return
+						}
+						go expire(store, key, expiryTime)
+					}
+				}
+			}
+
 			conn.Write([]byte("+OK\r\n"))
 		case "get":
 			key := respCommand.args[0]
 			val, ok := store.GET(key)
 			if !ok {
-				conn.Write([]byte("+NULL\r\n"))
+				fmt.Println("Key not found")
+				conn.Write([]byte("$-1\r\n"))
 			} else {
 				conn.Write([]byte(createBulkString(val)))
 			}
