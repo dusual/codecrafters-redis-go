@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -35,8 +36,9 @@ func main() {
 	fmt.Println("Logs from your program will appear here!")
 
 	// Uncomment this block to pass the first stage
-	//
-	l, err := net.Listen("tcp", "0.0.0.0:6379")
+	listenPort := flag.Int("port", 6379, "Port to listen for TCP connections on")
+	flag.Parse()
+	l, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", *listenPort))
 	if err != nil {
 		fmt.Println("Failed to bind to port 6379")
 		os.Exit(1)
