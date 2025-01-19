@@ -6,6 +6,19 @@ import (
 	"os"
 )
 
+func acceptConns(l net.Listener, acceptChan chan net.Conn) {
+	// Need a for loop to handle continuously handle connections
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection ", err.Error())
+			// os.Exit(1)
+			continue
+		}
+		acceptChan <- conn
+	}
+}
+
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
@@ -17,29 +30,30 @@ func main() {
 		fmt.Println("Failed to bind to port 6379")
 		os.Exit(1)
 	}
-	conn, err := l.Accept()
-	defer conn.Close()
+	connChannel := make(chan net.Conn)
+	go acceptConns(l, connChannel)
+
 	if err != nil {
 		fmt.Println("Error accepting connection: ", err.Error())
 		os.Exit(1)
 	}
 	for {
-		if err != nil {
-			fmt.Println("Error accepting connection: ", err.Error())
-			os.Exit(1)
-		}
-		handleClient(conn)
+		conn := <-connChannel
+		go handleConn(conn)
 	}
 }
 
-func handleClient(conn net.Conn) {
+func handleConn(conn net.Conn) {
 	// Ensure we close the connection after we're done
 	// Read data
-	buf := make([]byte, 1024)
-	_, err := conn.Read(buf)
-	if err != nil {
-		return
+	defer conn.Close()
+	for {
+		buf := make([]byte, 1024)
+		_, err := conn.Read(buf)
+		if err != nil {
+			return
+		}
+		fmt.Println(string(buf))
+		conn.Write([]byte("+PONG\r\n"))
 	}
-	fmt.Println(string(buf))
-	conn.Write([]byte("+PONG\r\n"))
 }
