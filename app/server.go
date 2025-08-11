@@ -103,6 +103,7 @@ func handleConn(conn net.Conn) {
 	// Ensure we close the connection after we're done
 	// Read data
 	defer conn.Close()
+	kv := NewKVStore()
 	for {
 		reader := bufio.NewReader(conn)
 		//cmd, err := parseRespCommand(reader)
@@ -113,6 +114,7 @@ func handleConn(conn net.Conn) {
 			}
 			return
 		}
+
 		switch strings.ToUpper(cmdParts[0]) {
 		case "PING":
 			conn.Write([]byte("+PONG\r\n"))
@@ -122,6 +124,28 @@ func handleConn(conn net.Conn) {
 				continue
 			}
 			writeBulkString(conn, cmdParts[1])
+		case "SET":
+			if len(cmdParts) == 3 {
+				key := cmdParts[1]
+				value := cmdParts[2]
+				kv.Set(key, value)
+				writeBulkString(conn, "OK")
+			} else {
+				conn.Write([]byte("-ERR wrong number of arguments for 'set' command\r\n"))
+			}
+		case "GET":
+			if len(cmdParts) == 2 {
+				key := cmdParts[1]
+				value, exists := kv.Get(key)
+				if exists {
+					writeBulkString(conn, value)
+				} else {
+					conn.Write([]byte("$-1\r\n"))
+				}
+			} else {
+				conn.Write([]byte("-ERR wrong number of arguments for 'get' command\r\n"))
+			}
+
 		default:
 			conn.Write([]byte("-ERR unknown command\r\n"))
 		}
